@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#f6f5f7">
+<title>Прайс — Taro By Miraele</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%94%AE%3C/text%3E%3C/svg%3E">
+<meta property="og:title" content="Прайс — Taro By Miraele">
+<meta property="og:description" content="Экспресс-расклады, отношения, общие расклады">
+<link rel="stylesheet" href="/price/vollkorn.css">
+<style>
+
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{--bg:#f6f5f7;--ink:#232329;--ink-soft:#33333b;--muted:#6f6f7a;
+        --accent:#7c4ddb;--accent-soft:#b49ce8;--label:#7c67c4;
+        --ease-out:cubic-bezier(.23,1,.32,1)}
+  html{-webkit-text-size-adjust:100%}
+  body{min-height:100vh;background:#e9e8ea;
+    font-family:'Vollkorn',Georgia,'Times New Roman',serif;color:var(--ink);
+    display:flex;justify-content:center;
+    padding:16px 12px calc(40px + env(safe-area-inset-bottom));
+    -webkit-font-smoothing:antialiased}
+
+  .card{position:relative;width:100%;max-width:520px;background:var(--bg);
+    border-radius:34px;overflow:hidden;box-shadow:0 14px 44px rgba(38,38,43,.12);
+    padding:34px 22px 30px}
+  .card::before{content:"";position:absolute;top:-150px;right:-120px;
+    width:430px;height:430px;border-radius:50%;pointer-events:none;
+    background:radial-gradient(circle at 35% 35%,rgba(196,178,240,.45),rgba(178,214,236,.32) 45%,rgba(246,245,247,0) 72%)}
+  .inner{position:relative}
+
+  .label{font-weight:700;font-size:11px;letter-spacing:.3em;text-transform:uppercase;
+    color:var(--label);padding:0 4px}
+  h1{margin-top:12px;padding:0 4px;font-weight:700;font-style:italic;font-size:38px;line-height:1;
+    letter-spacing:-.02em;text-transform:uppercase}
+  .lead{margin-top:14px;padding:0 4px;font-weight:700;font-size:15px;line-height:1.5;color:var(--muted)}
+
+  /* ── Категория: кнопка ведёт сразу на первый расклад ── */
+  .cat-btn{
+    display:flex;align-items:center;gap:12px;
+    margin-top:12px;padding:20px 18px;border-radius:20px;text-decoration:none;
+    background:#fff;border:0;
+    box-shadow:0 12px 30px rgba(38,38,43,.07);color:var(--ink);
+    -webkit-tap-highlight-color:transparent;
+    transition:transform 160ms var(--ease-out),background .2s ease,box-shadow .2s ease;
+  }
+  .cat-btn:first-of-type{margin-top:26px}
+  /* условия записи — тот же кирпич, но с фиолетовой полосой слева:
+     видно, что это не расклад, а правила работы */
+  .cat-btn.terms{border-left:4px solid var(--accent);margin-bottom:22px}
+  @media (hover:hover) and (pointer:fine){
+    .cat-btn:hover{box-shadow:0 14px 34px rgba(38,38,43,.12)}
+  }
+  .cat-btn:active{transform:scale(.97);background:#fff;transition-duration:100ms}
+  .cat-btn .st{flex:1 1 auto;min-width:0}
+  .cat-btn .name{display:block;font-weight:700;font-style:italic;font-size:18px;line-height:1.2;
+    letter-spacing:.01em;text-transform:uppercase}
+  .cat-btn .meta{display:block;margin-top:5px;font-weight:700;font-size:12px;
+    letter-spacing:.04em;color:var(--muted)}
+  .cat-btn .chev{flex:0 0 auto;width:26px;height:26px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    background:rgba(124,77,219,.12);color:var(--accent);font-size:13px;font-weight:700}
+
+  .fine{margin-top:30px;padding:0 4px;font-weight:700;font-size:13px;line-height:1.5;color:var(--muted)}
+  .back{display:block;margin-top:22px;text-align:center;padding:16px 12px;border-radius:16px;
+    background:#fff;border:0;box-shadow:0 8px 22px rgba(38,38,43,.06);
+    color:#3a3a41;text-decoration:none;font-size:12px;font-weight:700;
+    letter-spacing:.18em;text-transform:uppercase;
+    -webkit-tap-highlight-color:transparent;
+    transition:transform 160ms var(--ease-out)}
+  .back:active{background:#fff;transform:scale(.97);transition-duration:100ms}
+
+  /* появление каскадом, 30 мс между кирпичами; backwards — чтобы кадры
+     не задавили отклик кнопок на нажатие после появления */
+  .inner>*{animation:rise 320ms var(--ease-out) backwards}
+  @keyframes rise{from{opacity:0;transform:translateY(6px)}}
+  .inner>:nth-child(1){animation-delay:0ms}.inner>:nth-child(2){animation-delay:30ms}
+  .inner>:nth-child(3){animation-delay:60ms}.inner>:nth-child(4){animation-delay:90ms}
+  .inner>:nth-child(5){animation-delay:120ms}.inner>:nth-child(6){animation-delay:150ms}
+  .inner>:nth-child(7){animation-delay:180ms}.inner>:nth-child(8){animation-delay:210ms}
+  .inner>:nth-child(n+9){animation-delay:240ms}
+  @media (prefers-reduced-motion:reduce){
+    .inner>*{animation:fade 200ms ease backwards}
+    @keyframes fade{from{opacity:0}}
+    .cat-btn,.back,.cat-btn:active,.back:active{transition-duration:0ms;transform:none}
+  }
+
+  @media (max-width:380px){h1{font-size:32px}.row .t{font-size:15px}}
+
+  /* Vollkorn по умолчанию даёт старостильные (минускульные) цифры: единица
+     похожа на «i», ноль проваливается ниже строки. В номерах и ценах это
+     выглядит как ошибка — переключаем на прописные, ровные по высоте. */
+  body{font-variant-numeric:lining-nums;font-feature-settings:'lnum' 1}
+</style>
+</head>
+<body>
+  <script>document.addEventListener('touchstart',function(){},{passive:true});</script>
+  <main class="card">
+    <div class="inner">
+      <div class="label">Taro By Miraele</div>
+      <h1>Прайс</h1>
+      <p class="lead">Выберите расклад — внутри полный список вопросов, на которые ответят карты.</p>
+
+      
+      <!-- Условия записи — самой первой кнопкой, до категорий раскладов -->
+      <a class="cat-btn terms" href="/usloviya">
+        <span class="st">
+          <span class="name">Условия записи</span>
+          <span class="meta">Что прислать, сроки, предоплата</span>
+        </span>
+        <span class="chev">›</span>
+      </a>
+      
+
+      <a class="cat-btn" href="/price/tekuschiy-period"><span class="st"><span class="name">Экспресс-расклады</span><span class="meta">7 раскладов · от 1 800 ₽</span></span><span class="chev">›</span></a><a class="cat-btn" href="/price/kto-my-drug-drugu"><span class="st"><span class="name">Отношения</span><span class="meta">15 раскладов · от 3 000 ₽</span></span><span class="chev">›</span></a><a class="cat-btn" href="/price/perspektivy-novogo-biznesa"><span class="st"><span class="name">Общие расклады</span><span class="meta">10 раскладов · от 3 300 ₽</span></span><span class="chev">›</span></a>
+
+      <div class="fine">Каждый дополнительный вопрос к любому раскладу +400 ₽</div>
+      <a class="back" href="/">← На главную</a>
+    </div>
+  </main>
+</body>
+</html>

@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#e9e8ea">
+<title>Смена места работы — Taro By Miraele</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%94%AE%3C/text%3E%3C/svg%3E">
+<meta property="og:title" content="Смена места работы — расклад таро">
+<meta property="og:description" content="3 вопроса · 1 800 ₽">
+<link rel="stylesheet" href="/price/vollkorn.css">
+<style>
+
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    /* Палитра макета Pearl Bold: жемчужный фон, глубокая графитовая типографика,
+       фиолетовый только на числах, цене и кнопке. */
+    --bg:#f6f5f7;--ink:#232329;--ink-soft:#33333b;--muted:#6f6f7a;
+    --accent:#7c4ddb;--accent-soft:#b49ce8;--label:#7c67c4;
+    --rule:#ddd9e6;
+    /* кривые отклика (скилл Эмиля Ковальски): резкий старт, мягкий финиш;
+       drawer — кривая выезжающего окна как в iOS */
+    --ease-out:cubic-bezier(.23,1,.32,1);
+    --ease-drawer:cubic-bezier(.32,.72,0,1);
+    /* переменные автоподгона — их правит скрипт */
+    --fs-item:16px;      /* размер вопроса */
+    --gap-item:13px;     /* просвет между вопросами */
+    --fs-title:40px;     /* заголовок расклада */
+    --fs-price:42px;     /* цена */
+    --pad-block:22px;    /* вертикальные отступы блоков */
+    /* Капс шире строчных, поэтому на плотных раскладах разрядку тоже
+       поджимаем — это даёт место без потери размера букв. */
+    --ls-item:.015em;    /* разрядка в вопросах */
+    --k-extra:.93;       /* доля размера у допвопросов (без единиц) */
+  }
+  html,body{height:100%;overflow:hidden;-webkit-text-size-adjust:100%}
+  body{
+    background:#e9e8ea;
+    font-family:'Vollkorn',Georgia,'Times New Roman',serif;color:var(--ink);
+    display:flex;justify-content:center;align-items:stretch;
+    padding:8px 8px calc(8px + env(safe-area-inset-bottom));
+    -webkit-font-smoothing:antialiased;
+  }
+
+  .card{
+    position:relative;width:100%;max-width:520px;height:100%;
+    background:var(--bg);border-radius:28px;overflow:hidden;
+    box-shadow:0 14px 44px rgba(38,38,43,.12);
+    display:flex;flex-direction:column;
+    padding:calc(var(--pad-block) + 6px) 22px 10px;
+    /* горизонтальный свайп — наш, щипок оставляем браузеру */
+    touch-action:pan-y pinch-zoom;
+    will-change:transform;
+  }
+  /* карточка едет за пальцем; после отпускания — возврат или уход по кривой */
+  .card.settle{transition:transform 240ms var(--ease-out),opacity 240ms var(--ease-out)}
+  .card.leave{transition:transform 200ms var(--ease-out),opacity 200ms var(--ease-out)}
+  /* заезд новой карточки с той стороны, куда листали */
+  .card.enter-next,.card.enter-prev{opacity:0}
+  .card.enter-next{transform:translateX(40px)}
+  .card.enter-prev{transform:translateX(-40px)}
+  .card.entered{transition:transform 280ms var(--ease-out),opacity 280ms var(--ease-out);
+    transform:none;opacity:1}
+  .card::before{
+    content:"";position:absolute;top:-150px;right:-120px;
+    width:430px;height:430px;border-radius:50%;pointer-events:none;
+    background:radial-gradient(circle at 35% 35%,rgba(196,178,240,.45),rgba(178,214,236,.32) 45%,rgba(246,245,247,0) 72%);
+  }
+  .inner{position:relative;display:flex;flex-direction:column;flex:1 1 auto;min-height:0}
+
+  .label{font-weight:700;font-size:11px;letter-spacing:.3em;
+    text-transform:uppercase;color:var(--label)}
+  /* заголовок как в макете Pearl Bold: крупный, жирный, плотный по строкам */
+  h1{margin-top:12px;font-weight:700;font-style:italic;font-size:var(--fs-title);line-height:1;
+    letter-spacing:-.02em;text-transform:uppercase;overflow-wrap:break-word}
+
+  /* в макете между заголовком и ценой большой воздух */
+  .price-block{margin:calc(var(--pad-block) * 1.4) 0 var(--pad-block)}
+  .price{
+    /* Поля плашки едут вместе с --pad-block: на плотных раскладах это
+       отдаёт списку 15–20px, которых как раз не хватало. */
+    display:inline-block;border-radius:18px;
+    padding:clamp(9px, calc(var(--pad-block) * .75), 16px) 24px;
+    background:#fff;border:0;
+    box-shadow:0 12px 30px rgba(38,38,43,.07);
+    font-weight:700;font-style:italic;font-size:var(--fs-price);line-height:1;
+    letter-spacing:-.02em;color:var(--accent);
+    white-space:nowrap;
+  }
+  .price .n{font-weight:700;font-size:10px;letter-spacing:.2em;text-transform:uppercase;
+    color:var(--muted);display:block;margin-bottom:8px}
+
+  /* Список начинается сразу под ценой и занимает остаток высоты.
+     Короткий расклад (3 вопроса) прижат к цене, свободное место —
+     внизу, перед подвалом; длинный ложится плотно. */
+  .body{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;
+    justify-content:flex-start;overflow:hidden;
+    /* поля под стрелки — только у списка, шапка и подвал во всю ширину */
+    padding:0 24px}
+
+  /* Главное отличие Pearl Bold: вопросы капсом и полужирным — на телефоне
+     тонкий Jost был почти не виден. */
+  ol{list-style:none;display:grid;grid-template-columns:22px 1fr;
+    column-gap:8px;row-gap:var(--gap-item);
+    font-weight:700;font-style:italic;font-size:var(--fs-item);line-height:1.24;
+    letter-spacing:var(--ls-item);text-transform:uppercase;color:var(--ink);
+    counter-reset:i}
+  ol li{display:grid;grid-template-columns:subgrid;grid-column:1/-1;
+    counter-increment:i;overflow-wrap:break-word}
+  ol li::before{content:counter(i);color:var(--accent);font-weight:700}
+  ol li.group{grid-template-columns:1fr;counter-increment:none;
+    font-weight:700;font-size:.78em;letter-spacing:.2em;text-transform:uppercase;
+    color:var(--muted);margin-top:4px}
+  ol li.group::before{content:none}
+  ol li.group:first-child{margin-top:0}
+
+  /* Дополнительные вопросы — под чертой */
+  .extra{margin-top:var(--pad-block);padding-top:calc(var(--pad-block) * .8);
+    border-top:2px solid var(--rule)}
+  .extra h2{font-weight:700;font-size:10px;letter-spacing:.24em;text-transform:uppercase;
+    color:var(--muted)}
+  .extra .hint{margin-top:5px;margin-bottom:11px;font-weight:700;font-style:italic;
+    font-size:calc(var(--fs-item) * .85);line-height:1.35;color:var(--accent)}
+  /* просветы в блоке допвопросов не раздуваем вслед за основным списком —
+     там всегда плотно, ограничиваем потолком */
+  .extra ol{font-size:calc(var(--fs-item) * var(--k-extra));color:var(--ink-soft);
+    row-gap:min(calc(var(--gap-item) * .85), 14px)}
+  .extra ol li::before{color:var(--accent-soft)}
+
+  .foot{margin-top:auto;padding-top:14px}
+  .fine{font-weight:700;font-size:calc(var(--fs-item) * .8);line-height:1.4;color:var(--muted)}
+  .cta{
+    display:block;margin-top:10px;
+    background:var(--accent);color:var(--bg);text-align:center;
+    padding:15px 12px;border-radius:15px;
+    font-weight:700;font-size:12px;letter-spacing:.18em;text-transform:uppercase;
+    text-decoration:none;-webkit-tap-highlight-color:transparent;
+    transition:transform 160ms var(--ease-out),filter .2s ease;
+  }
+  @media (hover:hover) and (pointer:fine){ .cta:hover{filter:brightness(1.06)} }
+  .cta:active{transform:scale(.97);transition-duration:100ms}
+  .cta[aria-disabled="true"]{background:rgba(139,111,214,.35);cursor:default}
+  .cta[aria-disabled="true"]:hover{filter:none}
+
+  /* ── Окно выбора мессенджера ── */
+  /* Окно живёт в разметке всегда: переходы, а не кадры — их можно перехватить
+     и развернуть на полпути. Уходит туда же, откуда пришло (снизу), и быстрее,
+     чем появлялось. */
+  .sheet{
+    position:fixed;inset:0;z-index:20;display:flex;
+    align-items:flex-end;justify-content:center;
+    background:rgba(38,38,43,.42);
+    -webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);
+    opacity:0;visibility:hidden;pointer-events:none;
+    transition:opacity 180ms var(--ease-out),visibility 0s linear 180ms;
+  }
+  .sheet.on{opacity:1;visibility:visible;pointer-events:auto;
+    transition:opacity 260ms var(--ease-drawer),visibility 0s}
+  .sheet-box{
+    position:relative;width:100%;max-width:520px;
+    background:var(--bg);border-radius:26px 26px 0 0;
+    padding:14px 20px calc(20px + env(safe-area-inset-bottom));
+    box-shadow:0 -12px 40px rgba(38,38,43,.22);
+    transform:translateY(100%);
+    transition:transform 200ms var(--ease-out);
+    touch-action:none;will-change:transform;
+  }
+  .sheet.on .sheet-box{transform:none;transition:transform 340ms var(--ease-drawer)}
+  /* пока тянут пальцем — никаких переходов, окно идёт 1:1 за пальцем */
+  .sheet.dragging,.sheet.dragging .sheet-box{transition:none}
+  /* ручка: видно, что окно можно утянуть вниз */
+  .grab{width:36px;height:4px;border-radius:2px;margin:0 auto 14px;
+    background:rgba(38,38,43,.18)}
+  .sheet h3{font-weight:700;font-size:17px;text-align:center;margin-bottom:4px}
+  .sheet .sub{font-weight:700;font-size:13px;line-height:1.45;color:var(--muted);
+    text-align:center;margin-bottom:16px}
+  .sheet a.mess{
+    display:flex;align-items:center;gap:12px;
+    padding:15px 16px;border-radius:16px;margin-bottom:8px;text-decoration:none;
+    background:rgba(255,255,255,.9);border:1px solid rgba(38,38,43,.07);
+    box-shadow:0 4px 14px rgba(38,38,43,.06);
+    color:var(--ink);font-weight:700;font-size:16px;
+    -webkit-tap-highlight-color:transparent;
+    transition:transform 160ms var(--ease-out),background .2s ease;
+  }
+  .sheet a.mess:active{background:#fff;transform:scale(.97);transition-duration:100ms}
+  .sheet a.mess .ico{width:26px;height:26px;flex-shrink:0}
+  .sheet a.mess .ico svg{width:100%;height:100%;display:block}
+  .sheet a.mess .m{flex:1 1 auto}
+  .sheet a.mess .m b{display:block;font-weight:700}
+  .sheet a.mess .m span{display:block;margin-top:2px;font-weight:700;
+    font-size:12px;color:var(--muted)}
+  .sheet .cancel{
+    display:block;width:100%;margin-top:6px;padding:14px;border:0;border-radius:15px;
+    background:rgba(38,38,43,.05);color:var(--muted);
+    font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+    transition:transform 160ms var(--ease-out);
+  }
+  .sheet .cancel:active{transform:scale(.97);transition-duration:100ms}
+  .sheet .done{
+    margin-top:10px;text-align:center;font-size:12.5px;line-height:1.45;
+    color:var(--accent);min-height:17px;
+  }
+
+  /* ── Перемотка: круглые стрелки у краёв карточки, по центру по вертикали ──
+     Первый расклад категории — только «вперёд», последний — только «назад». */
+  .arrow-nav{
+    position:absolute;top:50%;transform:translateY(-50%);z-index:4;
+    width:40px;height:40px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    background:rgba(255,255,255,.82);border:1px solid rgba(38,38,43,.07);
+    box-shadow:0 6px 18px rgba(38,38,43,.10);
+    color:var(--accent);font-size:19px;line-height:1;text-decoration:none;
+    -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+    -webkit-tap-highlight-color:transparent;
+    transition:transform 160ms var(--ease-out),background .2s ease,box-shadow .2s ease;
+  }
+  .arrow-nav.prev{left:2px}
+  .arrow-nav.next{right:2px}
+  @media (hover:hover) and (pointer:fine){
+    .arrow-nav:hover{background:#fff;box-shadow:0 8px 22px rgba(38,38,43,.16)}
+  }
+  .arrow-nav:active{transform:translateY(-50%) scale(.92);transition-duration:100ms}
+  /* подсказка направления: пока тянут к соседнему раскладу, его стрелка растёт */
+  .card.drag-next .arrow-nav.next,.card.drag-prev .arrow-nav.prev{
+    transform:translateY(-50%) scale(1.15);background:#fff}
+
+  /* ── «Назад» вверху слева, шапка расклада по центру ── */
+  .topbar{flex:0 0 auto;margin-bottom:10px}
+  .back{
+    display:inline-flex;align-items:center;gap:7px;
+    padding:8px 16px 8px 12px;border-radius:100px;text-decoration:none;
+    background:#fff;border:0;box-shadow:0 4px 14px rgba(38,38,43,.07);
+    color:#3a3a41;font-weight:700;font-size:11px;letter-spacing:.08em;
+    text-transform:uppercase;
+    -webkit-tap-highlight-color:transparent;
+    transition:transform 160ms var(--ease-out),background .2s ease;
+  }
+  .back:active{background:rgba(38,38,43,.09);transform:scale(.95);transition-duration:100ms}
+  .back .a{color:var(--accent);font-size:14px;line-height:1;font-weight:700}
+
+  /* шапка по макету Pearl: по левому краю, без центровки */
+  .label{text-align:left}
+  h1{text-align:left}
+  .price-block{display:block}
+  .pos{flex:0 0 auto;text-align:center;font-size:9.5px;font-weight:700;letter-spacing:.2em;
+    text-transform:uppercase;color:#9a9aa3;margin-top:12px}
+
+  /* Vollkorn по умолчанию даёт старостильные (минускульные) цифры: единица
+     похожа на «i», ноль проваливается ниже строки. В номерах и ценах это
+     выглядит как ошибка — переключаем на прописные, ровные по высоте. */
+  body{font-variant-numeric:lining-nums;font-feature-settings:'lnum' 1}
+
+  /* ── «Меньше движения»: окно и карточка просто проявляются, без езды ── */
+  @media (prefers-reduced-motion:reduce){
+    .sheet-box,.sheet.on .sheet-box{transform:none;transition:opacity 200ms ease}
+    .sheet-box{opacity:0}.sheet.on .sheet-box{opacity:1}
+    .card.enter-next,.card.enter-prev{transform:none}
+    .card.entered,.card.settle,.card.leave{transition:opacity 200ms ease}
+    .cta,.back,.arrow-nav,.sheet a.mess,.sheet .cancel{transition-duration:0ms}
+  }
+  /* «Меньше прозрачности»: плотный фон вместо размытия */
+  @media (prefers-reduced-transparency:reduce){
+    .sheet{background:rgba(38,38,43,.6);-webkit-backdrop-filter:none;backdrop-filter:none}
+    .arrow-nav{background:#fff;-webkit-backdrop-filter:none;backdrop-filter:none}
+  }
+</style>
+</head>
+<body>
+  <main class="card">
+    <a class="arrow-nav prev" href="/price/pereezd-ili-smena-mesta-zhitelstva-express" aria-label="Предыдущий расклад: Переезд или смена места жительства">‹</a><a class="arrow-nav next" href="/price/finansovye-trudnosti" aria-label="Следующий расклад: Финансовые трудности">›</a>
+    <div class="inner">
+      <div class="topbar"><a class="back" href="/price/"><span class="a">←</span>Назад</a></div>
+      <div class="label">Экспресс-расклады</div>
+      <h1>Смена места работы</h1>
+
+      <div class="price-block">
+        <div class="price"><span class="n">3 вопроса</span>1 800 ₽</div>
+      </div>
+
+      <div class="body">
+        <ol><li><span>Стоит ли мне менять работу?</span></li><li><span>Что мне даст смена места работы?</span></li><li><span>Перспективы на новом месте в ближайший год.</span></li></ol>
+        
+      </div>
+
+      <div class="foot">
+        <div class="fine">Любой дополнительный вопрос к этому раскладу +400 ₽</div>
+        <a class="cta" href="#" id="pick">Выбираю этот расклад</a>
+      </div>
+
+      <div class="pos">Экспресс-расклады · 6 из 7</div>
+    </div>
+  </main>
+
+  <!-- Выбор мессенджера: текст заявки уходит в чат таролога -->
+  <div class="sheet" id="sheet">
+    <div class="sheet-box" id="sheet-box">
+      <div class="grab" aria-hidden="true"></div>
+      <h3>Куда отправить заявку?</h3>
+      <p class="sub">Откроем чат с таро-мастером — останется отправить готовое сообщение.</p>
+
+      <a class="mess" id="go-tg" href="#">
+        <span class="ico"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="12" fill="#2AABEE"/><path fill="#fff" d="M5.4 11.7l11-4.24c.51-.19.96.12.79.9l-1.87 8.83c-.13.61-.5.76-1.01.47l-2.8-2.06-1.35 1.3c-.15.15-.28.28-.57.28l.2-2.87 5.2-4.7c.23-.2-.05-.31-.35-.12l-6.43 4.05-2.77-.86c-.6-.19-.61-.6.13-.89z"/></svg></span>
+        <span class="m"><b>Telegram</b><span>Заявка уже в поле — нажмите «Отправить»</span></span>
+      </a>
+
+      <a class="mess" id="go-max" href="#">
+        <span class="ico"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="mx" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#1EC0FF"/><stop offset="0.55" stop-color="#3B5BFF"/><stop offset="1" stop-color="#8A2BE2"/></linearGradient></defs><rect x="1" y="1" width="22" height="22" rx="7" fill="url(#mx)"/><path fill="#fff" d="M12 4.7c-4 0-7.2 2.9-7.2 6.6 0 2.1 1.05 4 2.7 5.2v3.3l3-1.65c.48.08.98.12 1.5.12 4 0 7.2-2.9 7.2-6.97S16 4.7 12 4.7z"/><circle cx="12" cy="11.3" r="3.4" fill="url(#mx)"/></svg></span>
+        <span class="m"><b>MAX</b><span>Текст скопируется — вставьте в чат</span></span>
+      </a>
+
+      <div class="done" id="done"></div>
+      <button class="cancel" id="close-sheet" type="button">Отмена</button>
+    </div>
+  </div>
+
+<script>
+// iOS Safari показывает :active только если на странице есть обработчик касания
+document.addEventListener('touchstart', function(){}, {passive: true});
+
+/* ── Автоподгон: вписываем карточку в высоту экрана без прокрутки ──
+   Ужимаем по шагам: сначала просветы, потом размер вопросов, потом
+   заголовок и цену. Меняем CSS-переменные, вёрстка пересчитывается сама. */
+(function(){
+  var root = document.documentElement;
+  var card = document.querySelector('.card');
+  var inner = document.querySelector('.inner');
+
+  // шаги: [переменная, старт, минимум, шаг]
+  /* Порядок важен: сначала ужимаем то, у чего больше запаса и что меньше
+     мешает читать (заголовок, цена, отступы блоков), и только в конце —
+     сам текст вопросов и просветы между ними. */
+  /* Разрядка в px, потому что автоподгон умеет только px; на 16px шрифта
+     .015em ≈ .24px, поэтому шаг мелкий, а низ уводим в минус — сжатый капс
+     читается лучше, чем капс на 10px. */
+  var STEPS = [
+    ['--fs-title',   40,  18,  1],
+    ['--fs-price',   42,  20,  1],
+    ['--pad-block',  22,   7,  2],
+    ['--ls-item',   .25, -.3, .05],
+    ['--gap-item',   13,   4,  1],
+    /* Допвопросы — второстепенные, их ужимаем раньше основных. */
+    ['--k-extra',   .93, .70, .02],
+    ['--fs-item',    16, 10.5, .5]
+  ];
+
+  var bodyEl = document.querySelector('.body');
+  var footEl = document.querySelector('.foot');
+
+  function overflow(){
+    /* Честный замер: список — flex-элемент, он не сжимается и при нехватке
+       места молча наползает на подвал. Поэтому сравниваем не scrollHeight,
+       а реальный нижний край содержимого с верхним краем подвала (и низом
+       карточки на всякий случай). */
+    /* Содержимое .body центрировано, поэтому при нехватке места оно вылезает
+       в обе стороны, и scrollHeight это скрывает. Меряем по реальным
+       границам первого и последнего элемента списка. */
+    /* Мерить по .extra нельзя: у .body стоит overflow:hidden, поэтому список
+       внутри .extra срезается молча, а рамка самого .extra остаётся на месте
+       и замер показывает «всё влезло». Берём САМЫЙ ГЛУБОКИЙ последний
+       элемент — реальную последнюю строку допвопросов. */
+    var box = bodyEl.getBoundingClientRect();
+    var first = bodyEl.firstElementChild;
+    var last = bodyEl.lastElementChild;
+    while (last && last.lastElementChild) last = last.lastElementChild;
+    var over = 0;
+    if (first) over = Math.max(over, box.top - first.getBoundingClientRect().top);
+    if (last)  over = Math.max(over, last.getBoundingClientRect().bottom - box.bottom);
+    // и подвал не должен вылезать за нижний край карточки
+    over = Math.max(over, inner.getBoundingClientRect().bottom - card.getBoundingClientRect().bottom);
+    return over;
+  }
+
+  /* Обратный ход: если места вдоволь (короткий экспресс-расклад на 3 вопроса),
+     раздуваем текст и просветы, чтобы карточка не зияла пустотой снизу.
+     [переменная, старт, потолок, шаг] */
+  var GROW = [
+    ['--fs-item',   16, 19, .5],
+    ['--gap-item',  13, 26, 1],
+    ['--pad-block', 22, 34, 2]
+  ];
+
+  /* --k-extra — доля, а не длина: её нельзя писать в px. */
+  var UNITLESS = {'--k-extra': 1};
+  function set(name, v){
+    root.style.setProperty(name, UNITLESS[name] ? String(v) : v + 'px');
+  }
+
+  function fit(){
+    var val = {};
+    STEPS.forEach(function(s){ val[s[0]] = s[1]; set(s[0], s[1]); });
+
+    var guard = 500, i, name, changed;
+
+    // 1) ужимаем, пока содержимое не влезет
+    while (overflow() > 0 && guard-- > 0){
+      changed = false;
+      for (i = 0; i < STEPS.length; i++){
+        name = STEPS[i][0];
+        var min = STEPS[i][2], step = STEPS[i][3];
+        if (val[name] - step >= min){
+          val[name] = Math.round((val[name] - step) * 100) / 100;
+          set(name, val[name]);
+          changed = true;
+          break;
+        }
+      }
+      if (!changed) break;   // ужимать больше нечего
+    }
+
+    // 2) если ужимать не пришлось — наоборот, разгоняем до комфортного предела
+    if (overflow() <= 0){
+      var capped = {};                     // локально, чтобы не портить GROW между вызовами
+      guard = 500;
+      while (guard-- > 0){
+        changed = false;
+        for (i = 0; i < GROW.length; i++){
+          name = GROW[i][0];
+          var max = GROW[i][2], gstep = GROW[i][3];
+          if (capped[name]) continue;
+          if (val[name] === undefined) val[name] = GROW[i][1];
+          if (val[name] + gstep > max){ capped[name] = true; continue; }
+          var prev = val[name];
+          val[name] = Math.round((val[name] + gstep) * 100) / 100;
+          set(name, val[name]);
+          if (overflow() > 0){              // перебрали — откат и стоп по этой переменной
+            val[name] = prev; set(name, prev);
+            capped[name] = true;
+          } else {
+            changed = true;
+          }
+        }
+        if (!changed) break;
+      }
+    }
+  }
+
+  function run(){ fit(); }
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(run);
+  run();
+  addEventListener('resize', run);
+  addEventListener('orientationchange', function(){ setTimeout(run, 120); });
+})();
+
+/* ── Свайп между раскладами (стрелки остаются) ──────────────────────────
+   Карточка едет за пальцем 1:1, на краю категории — с сопротивлением.
+   При отпускании считаем, куда долетит по инерции: перелетела за половину
+   или рывок сильный — уезжает и открывается соседний расклад, который
+   заезжает с той же стороны (пространственная согласованность Apple). */
+(function(){
+  var card = document.querySelector('.card');
+  var sheet = document.getElementById('sheet');
+  var prevA = document.querySelector('.arrow-nav.prev');
+  var nextA = document.querySelector('.arrow-nav.next');
+  var KEY = 'taro-swipe-dir';
+
+  // заезд с нужной стороны, если пришли перелистыванием
+  var dir = null;
+  try { dir = sessionStorage.getItem(KEY); sessionStorage.removeItem(KEY); } catch(e){}
+  if (dir === 'next' || dir === 'prev'){
+    card.classList.add('enter-' + dir);
+    requestAnimationFrame(function(){ requestAnimationFrame(function(){
+      card.classList.add('entered');
+      setTimeout(function(){ card.classList.remove('enter-' + dir, 'entered'); }, 320);
+    }); });
+  }
+  function remember(d){ try { sessionStorage.setItem(KEY, d); } catch(e){} }
+  if (prevA) prevA.addEventListener('click', function(){ remember('prev'); });
+  if (nextA) nextA.addEventListener('click', function(){ remember('next'); });
+
+  if (!prevA && !nextA) return;
+  var sx = 0, sy = 0, dx = 0, hist = [], active = false, axis = null, pid = null;
+  function rubber(over, dim){ var c = .55; return (over * dim * c) / (dim + c * Math.abs(over)); }
+  function project(v){ var d = .998; return (v / 1000) * d / (1 - d); }
+
+  card.addEventListener('pointerdown', function(e){
+    if (e.button !== 0 || active || sheet.classList.contains('on')) return;
+    active = true; axis = null; pid = e.pointerId;
+    sx = e.clientX; sy = e.clientY; dx = 0; hist = [[e.clientX, e.timeStamp]];
+  });
+  card.addEventListener('pointermove', function(e){
+    if (!active || e.pointerId !== pid) return;
+    var mx = e.clientX - sx, my = e.clientY - sy;
+    if (axis === null){
+      if (Math.abs(mx) < 10 && Math.abs(my) < 10) return;   // порог
+      axis = Math.abs(mx) > Math.abs(my) ? 'x' : 'y';
+      if (axis !== 'x'){ active = false; return; }
+      card.setPointerCapture(pid);
+      card.classList.remove('settle', 'leave');
+      card.style.userSelect = 'none';
+    }
+    dx = mx;
+    hist.push([e.clientX, e.timeStamp]); if (hist.length > 6) hist.shift();
+    var w = card.offsetWidth;
+    var canGo = dx < 0 ? !!nextA : !!prevA;
+    var x = canGo ? dx : (dx < 0 ? -rubber(-dx, w) : rubber(dx, w));
+    card.style.transform = 'translateX(' + x + 'px)';
+    card.style.opacity = String(1 - Math.min(Math.abs(x) / w, 1) * .45);
+    card.classList.toggle('drag-next', canGo && dx < -10);
+    card.classList.toggle('drag-prev', canGo && dx > 10);
+  });
+  function release(e){
+    if (!active || e.pointerId !== pid) return;
+    active = false;
+    if (axis !== 'x') return;
+    card.style.userSelect = '';
+    var w = card.offsetWidth;
+    var a = hist[0], b = hist[hist.length - 1];
+    var v = (b[1] > a[1]) ? (b[0] - a[0]) / (b[1] - a[1]) * 1000 : 0;
+    var land = dx + project(v);
+    var target = null, d = null;
+    if (nextA && (land < -w * .5 || v < -700)) { target = nextA; d = 'next'; }
+    if (prevA && (land >  w * .5 || v >  700)) { target = prevA; d = 'prev'; }
+    card.classList.remove('drag-next', 'drag-prev');
+    if (target){
+      card.classList.add('leave');
+      card.style.transform = 'translateX(' + (d === 'next' ? -w : w) + 'px)';
+      card.style.opacity = '0';
+      remember(d);
+      setTimeout(function(){ location.href = target.getAttribute('href'); }, 160);
+    } else {
+      card.classList.add('settle');
+      card.style.transform = ''; card.style.opacity = '';
+      setTimeout(function(){ card.classList.remove('settle'); }, 260);
+    }
+    swiped = true; setTimeout(function(){ swiped = false; }, 0);
+  }
+  var swiped = false;
+  card.addEventListener('pointerup', release);
+  card.addEventListener('pointercancel', release);
+  // после свайпа клик по ссылке под пальцем — не клик
+  card.addEventListener('click', function(e){
+    if (swiped){ e.stopPropagation(); e.preventDefault(); }
+  }, true);
+})();
+
+/* ── Заявка на расклад ────────────────────────────────────────────────
+   Текст заявки копируем в буфер и открываем личный чат таролога:
+   ни Telegram, ни MAX не дают подставить текст в личку со стороны сайта
+   (в Telegram так умеют только боты). Человеку остаётся вставить и отправить. */
+(function(){
+  var ORDER = {"title": "Смена места работы", "count": "3 вопроса", "price": "1 800 ₽", "items": ["Стоит ли мне менять работу?", "Что мне даст смена места работы?", "Перспективы на новом месте в ближайший год."]};
+  var TG = "Taro_by_Miraele13";       // логин таролога в Telegram
+  var MAX_URL = "https://max.ru/u/f9LHodD0cOLnxyMfPZhMN8rOU9Z9Biyp1aKysSqjODZPk3nJyNeaxJvCL8M";  // прямая ссылка на личку в MAX
+
+  function text(){
+    var s = "Здравствуйте! Хочу заказать расклад.\n\n";
+    s += "🔮 " + ORDER.title + "\n";
+    s += ORDER.count + " · " + ORDER.price + "\n\n";
+    s += "Вопросы:\n";
+    ORDER.items.forEach(function(it, i){
+      s += (i + 1) + ". " + it + "\n";
+    });
+    return s;
+  }
+
+  function copy(str){
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      return navigator.clipboard.writeText(str);
+    }
+    // запасной путь для старых браузеров
+    return new Promise(function(res, rej){
+      try{
+        var ta = document.createElement("textarea");
+        ta.value = str;
+        ta.style.position = "fixed"; ta.style.opacity = "0";
+        document.body.appendChild(ta); ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+        res();
+      } catch(e){ rej(e); }
+    });
+  }
+
+  var sheet = document.getElementById("sheet");
+  var box   = document.getElementById("sheet-box");
+  var done  = document.getElementById("done");
+
+  function openSheet(){ done.textContent = ""; sheet.classList.add("on"); }
+  function closeSheet(){ sheet.classList.remove("on"); }
+
+  document.getElementById("pick").addEventListener("click", function(e){
+    e.preventDefault();
+    openSheet();
+  });
+  document.getElementById("close-sheet").addEventListener("click", closeSheet);
+  sheet.addEventListener("click", function(e){
+    if (e.target === sheet) closeSheet();
+  });
+
+  /* ── Окно тянется пальцем вниз (принцип Apple: прямое управление) ──
+     Идёт 1:1 за пальцем, вверх — с нарастающим сопротивлением, при отпускании
+     считаем, куда бы оно долетело по инерции, и либо закрываем, либо
+     возвращаем. Переход всегда стартует с текущего положения — рывка нет. */
+  (function(){
+    var startY = 0, dy = 0, hist = [], active = false, moved = false, pid = null, eat = false;
+    function rubber(over, dim){ var c = .55; return (over * dim * c) / (dim + c * Math.abs(over)); }
+    function project(v){ var d = .998; return (v / 1000) * d / (1 - d); } // px/с → px
+    box.addEventListener("pointerdown", function(e){
+      if (e.button !== 0 || active) return;
+      active = true; moved = false; pid = e.pointerId;
+      startY = e.clientY; dy = 0; hist = [[e.clientY, e.timeStamp]];
+    });
+    box.addEventListener("pointermove", function(e){
+      if (!active || e.pointerId !== pid) return;
+      dy = e.clientY - startY;
+      if (!moved && Math.abs(dy) < 8) return;        // порог: тап ещё не жест
+      if (!moved){ moved = true; sheet.classList.add("dragging"); box.setPointerCapture(pid); }
+      hist.push([e.clientY, e.timeStamp]); if (hist.length > 6) hist.shift();
+      var h = box.offsetHeight;
+      var y = dy >= 0 ? dy : -rubber(-dy, h);        // вверх — сопротивление
+      box.style.transform = "translateY(" + y + "px)";
+      sheet.style.opacity = String(1 - Math.max(0, dy) / h * .8);
+    });
+    function release(e){
+      if (!active || e.pointerId !== pid) return;
+      active = false;
+      if (!moved) return;
+      moved = false; eat = true; setTimeout(function(){ eat = false; }, 0);
+      var h = box.offsetHeight;
+      var a = hist[0], b = hist[hist.length - 1];
+      var v = (b[1] > a[1]) ? (b[0] - a[0]) / (b[1] - a[1]) * 1000 : 0;   // px/с
+      var land = dy + project(v);
+      sheet.classList.remove("dragging");
+      box.style.transform = ""; sheet.style.opacity = "";
+      if (land > h * .45 || v > 600) closeSheet();     // рывка достаточно
+    }
+    box.addEventListener("pointerup", release);
+    box.addEventListener("pointercancel", release);
+    // после перетягивания клик по кнопке внутри — не клик
+    sheet.addEventListener("click", function(e){
+      if (eat){ e.stopPropagation(); e.preventDefault(); }
+    }, true);
+  })();
+
+  /* Открываем мессенджер только ПОСЛЕ копирования: иначе вкладка уходит
+     в приложение раньше, чем браузер успевает положить текст в буфер. */
+  function send(open, note){
+    return function(e){
+      e.preventDefault();
+      copy(text()).then(function(){
+        done.textContent = note.ok;
+        setTimeout(open, 450);
+      }).catch(function(){
+        done.textContent = note.fail;
+        setTimeout(open, 900);
+      });
+    };
+  }
+
+  /* Telegram кладёт текст прямо в поле ввода личного чата — параметр text
+     у ссылки на человека (core.telegram.org/api/links, «draft_text»).
+     Человеку остаётся нажать «Отправить», вставлять из буфера не нужно.
+     Буфер всё равно заполняем: это тихий запасной путь для старых клиентов,
+     где параметр может не сработать. Переносы строк уходят как %0A. */
+  document.getElementById("go-tg").addEventListener("click", send(function(){
+    var msg = encodeURIComponent(text());
+    /* Голая ссылка t.me виснет в браузере телефона (урок LUNEO):
+       сначала пробуем приложение, через 800 мс уходим на веб-версию. */
+    var opened = false;
+    var onHide = function(){ opened = true; };
+    document.addEventListener("visibilitychange", onHide);
+    window.location.href = "tg://resolve?domain=" + TG + "&text=" + msg;
+    setTimeout(function(){
+      document.removeEventListener("visibilitychange", onHide);
+      if (!opened && document.visibilityState === "visible"){
+        window.location.href = "https://t.me/" + TG + "?text=" + msg;
+      }
+    }, 800);
+  }, {
+    ok:   "Открываем чат — заявка уже в поле, останется нажать «Отправить»",
+    fail: "Открываем чат — заявка уже в поле, останется нажать «Отправить»"
+  }));
+
+  /* У MAX ссылки «конкретный человек + текст» нет (dev.max.ru/help/deeplinks:
+     есть только start, startapp и :share с выбором получателя), поэтому здесь
+     остаётся буфер обмена. */
+  document.getElementById("go-max").addEventListener("click", send(function(){
+    window.location.href = MAX_URL;
+  }, {
+    ok:   "Текст заявки скопирован — вставьте его в чат",
+    fail: "Не удалось скопировать — напишите тему расклада в чате"
+  }));
+})();
+</script>
+</body>
+</html>
